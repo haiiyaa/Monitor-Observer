@@ -1,0 +1,123 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using Temperatur_Monitor_Observer_Library;
+using System.Threading;
+using System.Windows.Threading;
+
+namespace Opgave_9
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        private bool stopGenerator = true;
+        TemperatureMonitor TM;
+        public MainWindow()
+        {
+            InitializeComponent();
+            
+            TM = new TemperatureMonitor(); 
+            TM.MaxAlarmEvent += TermometerMaxAlarmEvent; //tilføj TermometerMaxEvent til min Event liste (som overholder min delegate i TM)
+            TM.MinAlarmEvent += TermometerMinAlarmEvent; //tilføj TermometerMinEvent til min Event liste (som overholder min delegate i TM)
+            TM.MaxTemperatureChangeEvent += TermometerMaxTempChange;
+            TM.MinTemperatureChangeEvent += TermometerMinTempChange;
+            TM.NoTemperatureChangeEvent += TermometerNoTempChange;
+
+            TM.MinTemperaturAlarm = -20; //hvis input er under dette, så skriv alarm
+            TM.MaxTemperaturAlarm = 140; //hvis input er over dette, så skriv alarm
+            label_interval.Content = "Lovligt interval: Min: " + TM.MinTemperaturAlarm + ", Max: " + TM.MaxTemperaturAlarm;
+
+            Thread t1 = new Thread(TemperatureGenerator);
+            t1.Start();
+        }
+
+        public void TemperatureGenerator()
+        {
+            while (true) 
+            {
+                while (!stopGenerator)
+                {
+                    Random r = new Random();
+                    TM.AktuelTemperatur = r.Next(TM.MinTemperaturAlarm - 20, TM.MaxTemperaturAlarm + 20);  // setting TM.AktuelTemperatur will trigger the event
+                    Thread.Sleep(2000);
+                }
+            }
+        }
+
+        public void TermometerMaxAlarmEvent(string besked, TemperatureMonitor temperatureMonitor)
+        {
+            
+            Dispatcher.BeginInvoke(new Action(() => txtbox_output.Text = "Alarm: " + besked));
+            Dispatcher.BeginInvoke(new Action(() => txtbox_illegalMax.Text = temperatureMonitor.MaxIllegalTemperatur.ToString()));
+        }
+        public void TermometerMinAlarmEvent(string besked, TemperatureMonitor temperatureMonitor)
+        {
+            Dispatcher.BeginInvoke(new Action(() => txtbox_output.Text = "Alarm: " + besked));
+            Dispatcher.BeginInvoke(new Action(() => txtbox_illegalMin.Text = temperatureMonitor.MinIllegalTemperatur.ToString()));
+        }
+        public void TermometerMaxTempChange(string besked)
+        {
+            Dispatcher.BeginInvoke(new Action(() => txtbox_output.Text = besked));
+            Dispatcher.BeginInvoke(new Action(() => txtbox_legalMax.Text = TM.MaxTemperatur.ToString()));
+        }
+        public void TermometerMinTempChange(string besked)
+        {
+             
+            Dispatcher.BeginInvoke(new Action(() => txtbox_output.Text = besked));
+            Dispatcher.BeginInvoke(new Action(() => txtbox_legalMin.Text = TM.MinTemperatur.ToString()));
+        }
+
+        public void TermometerNoTempChange(string besked)
+        {
+            Dispatcher.BeginInvoke(new Action(() => txtbox_output.Text = besked));
+        }
+
+        private void btn_Start_Click(object sender, RoutedEventArgs e)
+        {
+            stopGenerator = false;
+        }
+
+        private void btn_Stop_Click(object sender, RoutedEventArgs e)
+        {
+            stopGenerator = true;
+            txtbox_output.Text = "Tryk på start for at starte monitoren!";
+        }
+
+        private void btn_Clear_Click(object sender, RoutedEventArgs e)
+        {
+            TM.Clear();
+            txtbox_legalMin.Text = "";
+            txtbox_legalMax.Text = "";
+            txtbox_illegalMin.Text = "";
+            txtbox_illegalMax.Text = "";
+            label_SetNotice.Visibility = Visibility.Hidden;
+        }
+
+        private void btn_Set_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                TM.MinTemperatur = int.Parse(txtbox_legalMin.Text);
+                TM.MaxTemperatur = int.Parse(txtbox_legalMax.Text);
+            }
+            catch
+            {
+                label_SetNotice.Visibility = Visibility.Visible;
+            }
+
+        }
+    }
+}
