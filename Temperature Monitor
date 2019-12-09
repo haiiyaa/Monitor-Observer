@@ -1,0 +1,92 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Temperatur_Monitor_Observer_Library
+{
+    public class TemperatureMonitor
+    {
+        public delegate void TermometerAlarmDelegate(string besked, TemperatureMonitor termometerMonitor);
+        public delegate void TermometerTemperatureChange(string besked);
+
+        public event TermometerAlarmDelegate MaxAlarmEvent;
+        public event TermometerAlarmDelegate MinAlarmEvent;
+        public event TermometerTemperatureChange MinTemperatureChangeEvent;
+        public event TermometerTemperatureChange MaxTemperatureChangeEvent;
+        public event TermometerTemperatureChange NoTemperatureChangeEvent;
+
+        private int _aktuelTemperatur;
+        private int _minTemperaturAlarm;
+        private int _maxTemperaturAlarm;
+        private int _minTemperatur = 140;
+        private int _maxTemperatur = -20;
+        private int _minForbudtTemperatur = -20; 
+        private int _maxForbudtTemperatur = 140; 
+
+        object _lås = new object();
+
+        public int AktuelTemperatur
+        {
+
+            get
+            {
+                return _aktuelTemperatur;
+            }
+            set  // will trigger the event
+            {
+               
+                lock (_lås)
+                {
+
+                    _aktuelTemperatur = value;
+
+                    if (_aktuelTemperatur >= _minTemperaturAlarm && _aktuelTemperatur <= _maxTemperaturAlarm)
+                    //tjek om det er en lovlig temperatur
+                    {
+                        NoTemperatureChangeEvent("En lovlig temperatur blev målt: " + _aktuelTemperatur);
+                        //not above max or below min, just legal
+                        if (_aktuelTemperatur < _minTemperatur)
+                        {
+                            _minTemperatur = _aktuelTemperatur; //current top legal min temperature messured
+                            MinTemperatureChangeEvent("Ny laveste lovlige temperatur målt: " + _minTemperatur);
+                        }
+                        if (_aktuelTemperatur > _maxTemperatur)
+                        {
+                            _maxTemperatur = _aktuelTemperatur; //current top legal max temperature messured
+                            MaxTemperatureChangeEvent("Ny højeste lovlige temperatur målt: " + _maxTemperatur);
+                        }
+                    }
+                    else if (_aktuelTemperatur <= _minTemperaturAlarm)
+                    {
+                        _minForbudtTemperatur = _aktuelTemperatur; //current top illegal min temperature messured
+                        this.MinAlarmEvent("Temperaturen er under det tilladte interval: " + _aktuelTemperatur, this);
+                    }
+                    else //(input >= maxAlarm)
+                    {
+                        _maxForbudtTemperatur = _aktuelTemperatur;//current top illegal max temperature messured
+                        this.MaxAlarmEvent("Temperaturen er over det tilladte interval: " + _aktuelTemperatur, this);
+                    }
+                }
+            }
+        }
+        public int MaxTemperatur { get { return _maxTemperatur; } set { _maxTemperatur = value; } }
+        public int MinTemperatur { get { return _minTemperatur; } set { _minTemperatur = value; } }
+        public int MaxIllegalTemperatur { get { return _maxForbudtTemperatur; } set { _maxForbudtTemperatur = value; } }
+        public int MinIllegalTemperatur { get { return _minForbudtTemperatur; } set { _minForbudtTemperatur = value; } }
+        public int MinTemperaturAlarm { get { return _minTemperaturAlarm; } set { _minTemperaturAlarm = value; } }
+        public int MaxTemperaturAlarm { get { return _maxTemperaturAlarm; } set { _maxTemperaturAlarm = value; } }
+
+        public void Clear()
+        {
+            lock(_lås)
+            {
+                this._minTemperatur = _maxTemperaturAlarm;
+                this._maxTemperatur = _minTemperaturAlarm;
+                this._minForbudtTemperatur = _maxTemperaturAlarm;
+                this._maxForbudtTemperatur = _minTemperaturAlarm;
+            }
+        }
+    }
+}
